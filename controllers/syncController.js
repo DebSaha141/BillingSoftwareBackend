@@ -1,21 +1,28 @@
-const Product = require('../models/Product');
-const Bill = require('../models/Bill');
-const StoreSettings = require('../models/StoreSettings');
+const Product = require("../models/Product");
+const Customer = require("../models/Customer");
+const Bill = require("../models/Bill");
+const StoreSettings = require("../models/StoreSettings");
 
 /**
  * PUSH SYNC — App sends unsynced local data to cloud
  * POST /api/sync/push
- * 
+ *
  * This is the most critical endpoint.
  * The app batches all records where isSynced=false and sends them here.
  * We use upsert (update if exists, insert if not) based on uuid.
  */
 const pushSync = async (req, res, next) => {
   try {
-    const { products = [], bills = [], settings = null } = req.body;
+    const {
+      products = [],
+      customers = [],
+      bills = [],
+      settings = null,
+    } = req.body;
 
     const results = {
       products: { received: 0, errors: [] },
+      customers: { received: 0, errors: [] },
       bills: { received: 0, errors: [] },
       settings: { received: false },
     };
@@ -30,7 +37,7 @@ const pushSync = async (req, res, next) => {
             name: product.name,
             price: product.price,
             unit: product.unit,
-            category: product.category || 'General',
+            category: product.category || "General",
             isDeleted: product.isDeleted || false,
             createdAt: new Date(product.createdAt),
             updatedAt: new Date(product.updatedAt),
@@ -39,12 +46,40 @@ const pushSync = async (req, res, next) => {
             upsert: true, // Create if doesn't exist
             new: true, // Return the updated document
             runValidators: true,
-          }
+          },
         );
         results.products.received++;
       } catch (err) {
         results.products.errors.push({
           uuid: product.uuid,
+          error: err.message,
+        });
+      }
+    }
+
+    // --- PUSH CUSTOMERS ---
+    for (const customer of customers) {
+      try {
+        await Customer.findOneAndUpdate(
+          { uuid: customer.uuid },
+          {
+            uuid: customer.uuid,
+            name: customer.name,
+            phone: customer.phone || "",
+            isDeleted: customer.isDeleted || false,
+            createdAt: new Date(customer.createdAt),
+            updatedAt: new Date(customer.updatedAt),
+          },
+          {
+            upsert: true,
+            new: true,
+            runValidators: true,
+          },
+        );
+        results.customers.received++;
+      } catch (err) {
+        results.customers.errors.push({
+          uuid: customer.uuid,
           error: err.message,
         });
       }
@@ -65,9 +100,9 @@ const pushSync = async (req, res, next) => {
             taxPercent: bill.taxPercent || 0,
             taxAmount: bill.taxAmount || 0,
             grandTotal: bill.grandTotal,
-            paymentMethod: bill.paymentMethod || 'cash',
-            customerName: bill.customerName || '',
-            customerPhone: bill.customerPhone || '',
+            paymentMethod: bill.paymentMethod || "cash",
+            customerName: bill.customerName || "",
+            customerPhone: bill.customerPhone || "",
             isDeleted: bill.isDeleted || false,
             createdAt: new Date(bill.createdAt),
             updatedAt: new Date(bill.updatedAt),
@@ -76,7 +111,7 @@ const pushSync = async (req, res, next) => {
             upsert: true,
             new: true,
             runValidators: true,
-          }
+          },
         );
         results.bills.received++;
       } catch (err) {
@@ -91,13 +126,13 @@ const pushSync = async (req, res, next) => {
     if (settings) {
       try {
         await StoreSettings.findOneAndUpdate(
-          { uuid: 'store-settings-singleton' },
+          { uuid: "store-settings-singleton" },
           {
             ...settings,
-            uuid: 'store-settings-singleton',
+            uuid: "store-settings-singleton",
             updatedAt: new Date(settings.updatedAt),
           },
-          { upsert: true, new: true }
+          { upsert: true, new: true },
         );
         results.settings.received = true;
       } catch (err) {
@@ -107,7 +142,7 @@ const pushSync = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Push sync completed',
+      message: "Push sync completed",
       results,
     });
   } catch (error) {
@@ -118,7 +153,7 @@ const pushSync = async (req, res, next) => {
 /**
  * PULL SYNC — App requests changes since last sync
  * GET /api/sync/pull?since=2025-06-11T00:00:00.000Z
- * 
+ *
  * Returns all records modified after the given timestamp.
  * For single device this is usually empty, but handles:
  * - First install (since=epoch 0 → returns everything)
@@ -127,9 +162,7 @@ const pushSync = async (req, res, next) => {
  */
 const pullSync = async (req, res, next) => {
   try {
-    const since = req.query.since
-      ? new Date(req.query.since)
-      : new Date(0); // If no timestamp, send everything
+    const since = req.query.since ? new Date(req.query.since) : new Date(0); // If no timestamp, send everything
 
     // Validate the date
     if (isNaN(since.getTime())) {
@@ -143,7 +176,14 @@ const pullSync = async (req, res, next) => {
     const products = await Product.find({
       updatedAt: { $gt: since },
     })
-      .select('-_id -__v') // Exclude MongoDB internal fields
+      .select("-_id -__v") // Exclude MongoDB internal fields
+      .lean();
+
+    // Get customers updated after the timestamp
+    const customers = await Customer.find({
+      updatedAt: { $gt: since },
+    })
+      .select("-_id -__v")
       .lean();
 
     // Get bills updated after the timestamp
@@ -157,26 +197,28 @@ const pullSync = async (req, res, next) => {
       updatedAt: { $gt: since },
       createdAt: { $gte: billDateLimit },
     })
-      .select('-_id -__v')
+      .select("-_id -__v")
       .lean();
 
     // Get settings (always send it)
     const settings = await StoreSettings.findOne({
-      uuid: 'store-settings-singleton',
+      uuid: "store-settings-singleton",
     })
-      .select('-_id -__v')
+      .select("-_id -__v")
       .lean();
 
     res.status(200).json({
       success: true,
-      message: 'Pull sync completed',
+      message: "Pull sync completed",
       data: {
         products,
+        customers,
         bills,
         settings,
       },
       meta: {
         productCount: products.length,
+        customerCount: customers.length,
         billCount: bills.length,
         syncedAt: new Date().toISOString(),
       },
@@ -189,7 +231,7 @@ const pullSync = async (req, res, next) => {
 /**
  * FULL DOWNLOAD — First install, get everything
  * POST /api/sync/full-download
- * 
+ *
  * Separate from pull because:
  * - We might want to paginate bills
  * - Products are always sent in full
@@ -200,7 +242,12 @@ const fullDownload = async (req, res, next) => {
   try {
     // All active products
     const products = await Product.find({ isDeleted: false })
-      .select('-_id -__v')
+      .select("-_id -__v")
+      .lean();
+
+    // All active customers
+    const customers = await Customer.find({ isDeleted: false })
+      .select("-_id -__v")
       .lean();
 
     // Bills from last 3 months only
@@ -209,27 +256,29 @@ const fullDownload = async (req, res, next) => {
       isDeleted: false,
       createdAt: { $gte: threeMonthsAgo },
     })
-      .select('-_id -__v')
+      .select("-_id -__v")
       .sort({ createdAt: -1 })
       .lean();
 
     // Store settings
     const settings = await StoreSettings.findOne({
-      uuid: 'store-settings-singleton',
+      uuid: "store-settings-singleton",
     })
-      .select('-_id -__v')
+      .select("-_id -__v")
       .lean();
 
     res.status(200).json({
       success: true,
-      message: 'Full download completed',
+      message: "Full download completed",
       data: {
         products,
+        customers,
         bills,
         settings,
       },
       meta: {
         productCount: products.length,
+        customerCount: customers.length,
         billCount: bills.length,
         billsFrom: threeMonthsAgo.toISOString(),
         downloadedAt: new Date().toISOString(),
