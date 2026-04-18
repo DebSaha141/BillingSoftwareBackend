@@ -23,6 +23,8 @@ const errorHandler = require('./middleware/errorHandler');
 // Initialize Express
 const app = express();
 
+let dbReadyPromise;
+
 // ─── MIDDLEWARE ───────────────────────────────────────
 // Security headers
 app.use(helmet());
@@ -45,6 +47,19 @@ if (process.env.NODE_ENV === 'development') {
 // Increased limit because sync push can send large batches
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Ensure database is connected before handling API requests in serverless mode.
+app.use('/api', async (req, res, next) => {
+  try {
+    if (!dbReadyPromise) {
+      dbReadyPromise = connectDB();
+    }
+    await dbReadyPromise;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ─── ROUTES ──────────────────────────────────────────
 // Health check
@@ -78,16 +93,22 @@ app.use(errorHandler);
 // ─── START SERVER ────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 
-const startServer = async () => {
-  // Connect to MongoDB first
-  await connectDB();
+const isVercel = process.env.VERCEL === '1';
 
-  app.listen(PORT, () => {
-    console.log(`\n🚀 Billing server running on port ${PORT}`);
-  });
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`Billing server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
 };
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+if (!isVercel) {
+  startServer();
+}
+
+module.exports = app;
