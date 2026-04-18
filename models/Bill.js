@@ -1,35 +1,49 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 // Embedded subdocument — each item in the bill
-const billItemSchema = new mongoose.Schema({
-  productUuid: {
-    type: String,
-    required: true,
+const billItemSchema = new mongoose.Schema(
+  {
+    productUuid: {
+      type: String,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    unit: {
+      type: String,
+      required: true,
+    },
+    pricePerUnit: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    discountPercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    total: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
   },
-  name: {
-    type: String,
-    required: true,
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  unit: {
-    type: String,
-    required: true,
-  },
-  pricePerUnit: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  total: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-}, { _id: false }); // No need for separate _id on embedded docs
+  { _id: false },
+); // No need for separate _id on embedded docs
 
 const billSchema = new mongoose.Schema({
   uuid: {
@@ -53,7 +67,7 @@ const billSchema = new mongoose.Schema({
       validator: function (items) {
         return items.length > 0;
       },
-      message: 'Bill must have at least one item',
+      message: "Bill must have at least one item",
     },
   },
 
@@ -96,20 +110,20 @@ const billSchema = new mongoose.Schema({
 
   paymentMethod: {
     type: String,
-    enum: ['cash', 'upi', 'card', 'mixed', 'credit'],
-    default: 'cash',
+    enum: ["cash", "upi", "card", "mixed", "credit"],
+    default: "cash",
   },
 
   // Optional customer info
   customerName: {
     type: String,
     trim: true,
-    default: '',
+    default: "",
   },
   customerPhone: {
     type: String,
     trim: true,
-    default: '',
+    default: "",
   },
 
   // Soft delete
@@ -142,4 +156,4 @@ billSchema.index({ updatedAt: 1, isDeleted: 1 });
 // Index for searching bills by customer
 billSchema.index({ customerPhone: 1 });
 
-module.exports = mongoose.model('Bill', billSchema);
+module.exports = mongoose.model("Bill", billSchema);
