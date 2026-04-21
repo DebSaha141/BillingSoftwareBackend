@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const productSchema = new mongoose.Schema({
   // UUID generated on the Flutter app (client-side)
@@ -22,17 +22,25 @@ const productSchema = new mongoose.Schema({
     min: 0,
   },
 
+  sellingPrice: {
+    type: Number,
+    min: 0,
+    default: function () {
+      return this.price;
+    },
+  },
+
   unit: {
     type: String,
     required: true,
-    enum: ['kg', 'g', 'piece', 'liter', 'ml', 'packet', 'dozen', 'box'],
-    default: 'piece',
+    enum: ["kg", "g", "piece", "liter", "ml", "packet", "dozen", "box"],
+    default: "piece",
   },
 
   category: {
     type: String,
     trim: true,
-    default: 'General',
+    default: "General",
   },
 
   // Soft delete — never hard delete, sync needs to know about deletions
@@ -61,6 +69,6 @@ const productSchema = new mongoose.Schema({
 productSchema.index({ updatedAt: 1, isDeleted: 1 });
 
 // Text index for search (if we ever need server-side search)
-productSchema.index({ name: 'text' });
+productSchema.index({ name: "text" });
 
-module.exports = mongoose.model('Product', productSchema);
+module.exports = mongoose.model("Product", productSchema);

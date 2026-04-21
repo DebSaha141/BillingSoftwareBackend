@@ -1,9 +1,9 @@
-const Product = require('../models/Product');
+const Product = require("../models/Product");
 
 /**
  * These endpoints are NOT used by the Flutter app for normal operations.
  * The app uses Isar locally + sync endpoints.
- * 
+ *
  * These exist for:
  * - Future web dashboard
  * - Direct API testing
@@ -19,13 +19,13 @@ const getAllProducts = async (req, res, next) => {
     const filter = {};
 
     // By default, exclude deleted products
-    if (includeDeleted !== 'true') {
+    if (includeDeleted !== "true") {
       filter.isDeleted = false;
     }
 
     // Search by name
     if (search) {
-      filter.name = { $regex: search, $options: 'i' };
+      filter.name = { $regex: search, $options: "i" };
     }
 
     // Filter by category
@@ -34,7 +34,7 @@ const getAllProducts = async (req, res, next) => {
     }
 
     const products = await Product.find(filter)
-      .select('-__v')
+      .select("-__v")
       .sort({ name: 1 })
       .lean();
 
@@ -52,13 +52,13 @@ const getAllProducts = async (req, res, next) => {
 const getProductByUuid = async (req, res, next) => {
   try {
     const product = await Product.findOne({ uuid: req.params.uuid })
-      .select('-__v')
+      .select("-__v")
       .lean();
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        error: 'Product not found',
+        error: "Product not found",
       });
     }
 
@@ -74,8 +74,16 @@ const getProductByUuid = async (req, res, next) => {
 // POST /api/products
 const createProduct = async (req, res, next) => {
   try {
-    const product = await Product.create({
+    const payload = {
       ...req.body,
+      sellingPrice:
+        req.body.sellingPrice !== undefined
+          ? req.body.sellingPrice
+          : req.body.price,
+    };
+
+    const product = await Product.create({
+      ...payload,
       createdAt: req.body.createdAt || new Date(),
       updatedAt: req.body.updatedAt || new Date(),
     });
@@ -92,19 +100,26 @@ const createProduct = async (req, res, next) => {
 // PUT /api/products/:uuid
 const updateProduct = async (req, res, next) => {
   try {
+    const payload = { ...req.body };
+    if (req.body.sellingPrice !== undefined) {
+      payload.sellingPrice = req.body.sellingPrice;
+    } else if (req.body.price !== undefined) {
+      payload.sellingPrice = req.body.price;
+    }
+
     const product = await Product.findOneAndUpdate(
       { uuid: req.params.uuid },
       {
-        ...req.body,
+        ...payload,
         updatedAt: new Date(),
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        error: 'Product not found',
+        error: "Product not found",
       });
     }
 
@@ -126,19 +141,19 @@ const deleteProduct = async (req, res, next) => {
         isDeleted: true,
         updatedAt: new Date(),
       },
-      { new: true }
+      { new: true },
     );
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        error: 'Product not found',
+        error: "Product not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Product deleted (soft)',
+      message: "Product deleted (soft)",
       data: product,
     });
   } catch (error) {
@@ -149,7 +164,7 @@ const deleteProduct = async (req, res, next) => {
 // GET /api/products/categories/list
 const getCategories = async (req, res, next) => {
   try {
-    const categories = await Product.distinct('category', {
+    const categories = await Product.distinct("category", {
       isDeleted: false,
     });
 

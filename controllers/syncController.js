@@ -30,24 +30,34 @@ const pushSync = async (req, res, next) => {
     // --- PUSH PRODUCTS ---
     for (const product of products) {
       try {
-        await Product.findOneAndUpdate(
-          { uuid: product.uuid },
-          {
-            uuid: product.uuid,
-            name: product.name,
-            price: product.price,
-            unit: product.unit,
-            category: product.category || "General",
-            isDeleted: product.isDeleted || false,
-            createdAt: new Date(product.createdAt),
-            updatedAt: new Date(product.updatedAt),
-          },
-          {
-            upsert: true, // Create if doesn't exist
-            new: true, // Return the updated document
-            runValidators: true,
-          },
-        );
+        // If product is marked as deleted, physically remove from MongoDB
+        if (product.isDeleted === true || product.isDeleted === "true") {
+          const deleteResult = await Product.deleteOne({ uuid: product.uuid });
+          console.log(
+            `[Sync] Deleted product ${product.uuid}: ${deleteResult.deletedCount} doc(s) removed`,
+          );
+        } else {
+          await Product.findOneAndUpdate(
+            { uuid: product.uuid },
+            {
+              uuid: product.uuid,
+              name: product.name,
+              price: product.price,
+              sellingPrice: product.sellingPrice ?? product.price,
+              unit: product.unit,
+              category: product.category || "General",
+              isDeleted: false,
+              createdAt: new Date(product.createdAt),
+              updatedAt: new Date(product.updatedAt),
+            },
+            {
+              upsert: true, // Create if doesn't exist
+              new: true, // Return the updated document
+              runValidators: true,
+            },
+          );
+        }
+
         results.products.received++;
       } catch (err) {
         results.products.errors.push({
@@ -60,22 +70,31 @@ const pushSync = async (req, res, next) => {
     // --- PUSH CUSTOMERS ---
     for (const customer of customers) {
       try {
-        await Customer.findOneAndUpdate(
-          { uuid: customer.uuid },
-          {
+        if (customer.isDeleted === true || customer.isDeleted === "true") {
+          const deleteResult = await Customer.deleteOne({
             uuid: customer.uuid,
-            name: customer.name,
-            phone: customer.phone || "",
-            isDeleted: customer.isDeleted || false,
-            createdAt: new Date(customer.createdAt),
-            updatedAt: new Date(customer.updatedAt),
-          },
-          {
-            upsert: true,
-            new: true,
-            runValidators: true,
-          },
-        );
+          });
+          console.log(
+            `[Sync] Deleted customer ${customer.uuid}: ${deleteResult.deletedCount} doc(s) removed`,
+          );
+        } else {
+          await Customer.findOneAndUpdate(
+            { uuid: customer.uuid },
+            {
+              uuid: customer.uuid,
+              name: customer.name,
+              phone: customer.phone || "",
+              isDeleted: false,
+              createdAt: new Date(customer.createdAt),
+              updatedAt: new Date(customer.updatedAt),
+            },
+            {
+              upsert: true,
+              new: true,
+              runValidators: true,
+            },
+          );
+        }
         results.customers.received++;
       } catch (err) {
         results.customers.errors.push({
@@ -88,31 +107,38 @@ const pushSync = async (req, res, next) => {
     // --- PUSH BILLS ---
     for (const bill of bills) {
       try {
-        await Bill.findOneAndUpdate(
-          { uuid: bill.uuid },
-          {
-            uuid: bill.uuid,
-            billNumber: bill.billNumber,
-            items: bill.items,
-            subtotal: bill.subtotal,
-            discountPercent: bill.discountPercent || 0,
-            discountAmount: bill.discountAmount || 0,
-            taxPercent: bill.taxPercent || 0,
-            taxAmount: bill.taxAmount || 0,
-            grandTotal: bill.grandTotal,
-            paymentMethod: bill.paymentMethod || "cash",
-            customerName: bill.customerName || "",
-            customerPhone: bill.customerPhone || "",
-            isDeleted: bill.isDeleted || false,
-            createdAt: new Date(bill.createdAt),
-            updatedAt: new Date(bill.updatedAt),
-          },
-          {
-            upsert: true,
-            new: true,
-            runValidators: true,
-          },
-        );
+        if (bill.isDeleted === true || bill.isDeleted === "true") {
+          const deleteResult = await Bill.deleteOne({ uuid: bill.uuid });
+          console.log(
+            `[Sync] Deleted bill ${bill.uuid}: ${deleteResult.deletedCount} doc(s) removed`,
+          );
+        } else {
+          await Bill.findOneAndUpdate(
+            { uuid: bill.uuid },
+            {
+              uuid: bill.uuid,
+              billNumber: bill.billNumber,
+              items: bill.items,
+              subtotal: bill.subtotal,
+              discountPercent: bill.discountPercent || 0,
+              discountAmount: bill.discountAmount || 0,
+              taxPercent: bill.taxPercent || 0,
+              taxAmount: bill.taxAmount || 0,
+              grandTotal: bill.grandTotal,
+              paymentMethod: bill.paymentMethod || "cash",
+              customerName: bill.customerName || "",
+              customerPhone: bill.customerPhone || "",
+              isDeleted: false,
+              createdAt: new Date(bill.createdAt),
+              updatedAt: new Date(bill.updatedAt),
+            },
+            {
+              upsert: true,
+              new: true,
+              runValidators: true,
+            },
+          );
+        }
         results.bills.received++;
       } catch (err) {
         results.bills.errors.push({
@@ -172,16 +198,18 @@ const pullSync = async (req, res, next) => {
       });
     }
 
-    // Get products updated after the timestamp
+    // Get products updated after the timestamp (exclude deleted ones)
     const products = await Product.find({
       updatedAt: { $gt: since },
+      isDeleted: false,
     })
       .select("-_id -__v") // Exclude MongoDB internal fields
       .lean();
 
-    // Get customers updated after the timestamp
+    // Get customers updated after the timestamp (exclude deleted ones)
     const customers = await Customer.find({
       updatedAt: { $gt: since },
+      isDeleted: false,
     })
       .select("-_id -__v")
       .lean();
@@ -196,6 +224,7 @@ const pullSync = async (req, res, next) => {
     const bills = await Bill.find({
       updatedAt: { $gt: since },
       createdAt: { $gte: billDateLimit },
+      isDeleted: false,
     })
       .select("-_id -__v")
       .lean();
