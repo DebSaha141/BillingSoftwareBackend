@@ -43,6 +43,12 @@ const pushSync = async (req, res, next) => {
               uuid: product.uuid,
               name: product.name,
               price: product.price,
+              purchasePrice:
+                product.purchasePrice === "" ||
+                product.purchasePrice === null ||
+                product.purchasePrice === undefined
+                  ? undefined
+                  : product.purchasePrice,
               sellingPrice: product.sellingPrice ?? product.price,
               unit: product.unit,
               category: product.category || "General",

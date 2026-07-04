@@ -1,5 +1,8 @@
 const Product = require("../models/Product");
 
+const normalizeOptionalNumber = (value) =>
+  value === "" || value === null || value === undefined ? undefined : value;
+
 /**
  * These endpoints are NOT used by the Flutter app for normal operations.
  * The app uses Isar locally + sync endpoints.
@@ -76,6 +79,7 @@ const createProduct = async (req, res, next) => {
   try {
     const payload = {
       ...req.body,
+      purchasePrice: normalizeOptionalNumber(req.body.purchasePrice),
       sellingPrice:
         req.body.sellingPrice !== undefined
           ? req.body.sellingPrice
@@ -101,6 +105,9 @@ const createProduct = async (req, res, next) => {
 const updateProduct = async (req, res, next) => {
   try {
     const payload = { ...req.body };
+    if (req.body.purchasePrice !== undefined) {
+      payload.purchasePrice = normalizeOptionalNumber(req.body.purchasePrice);
+    }
     if (req.body.sellingPrice !== undefined) {
       payload.sellingPrice = req.body.sellingPrice;
     } else if (req.body.price !== undefined) {

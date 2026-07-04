@@ -22,6 +22,12 @@ const productSchema = new mongoose.Schema({
     min: 0,
   },
 
+  // Optional acquisition cost used only for internal tracking
+  purchasePrice: {
+    type: Number,
+    min: 0,
+  },
+
   sellingPrice: {
     type: Number,
     min: 0,
