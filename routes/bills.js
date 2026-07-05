@@ -1,16 +1,14 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 const {
   getAllBills,
   getBillByUuid,
+  updateBill,
   deleteBill,
-} = require('../controllers/billController');
+} = require("../controllers/billController");
 
-router.route('/')
-  .get(getAllBills);
+router.route("/").get(getAllBills);
 
-router.route('/:uuid')
-  .get(getBillByUuid)
-  .delete(deleteBill);
+router.route("/:uuid").get(getBillByUuid).patch(updateBill).delete(deleteBill);
 
 module.exports = router;

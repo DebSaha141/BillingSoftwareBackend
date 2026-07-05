@@ -1,4 +1,17 @@
-const Bill = require('../models/Bill');
+const Bill = require("../models/Bill");
+
+const normalizeBillPayload = (body, uuid) => {
+  const timestamp = body.timestamp ?? body.createdAt;
+
+  return {
+    ...body,
+    uuid,
+    timestamp,
+    createdAt: timestamp,
+    items: body.items,
+    updatedAt: body.updatedAt ? body.updatedAt : new Date(),
+  };
+};
 
 // GET /api/bills
 const getAllBills = async (req, res, next) => {
@@ -24,9 +37,9 @@ const getAllBills = async (req, res, next) => {
     // Search by bill number or customer name/phone
     if (search) {
       filter.$or = [
-        { billNumber: { $regex: search, $options: 'i' } },
-        { customerName: { $regex: search, $options: 'i' } },
-        { customerPhone: { $regex: search, $options: 'i' } },
+        { billNumber: { $regex: search, $options: "i" } },
+        { customerName: { $regex: search, $options: "i" } },
+        { customerPhone: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -39,7 +52,7 @@ const getAllBills = async (req, res, next) => {
 
     const [bills, total] = await Promise.all([
       Bill.find(filter)
-        .select('-__v')
+        .select("-__v")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
@@ -64,13 +77,45 @@ const getAllBills = async (req, res, next) => {
 const getBillByUuid = async (req, res, next) => {
   try {
     const bill = await Bill.findOne({ uuid: req.params.uuid })
-      .select('-__v')
+      .select("-__v")
       .lean();
 
     if (!bill) {
       return res.status(404).json({
         success: false,
-        error: 'Bill not found',
+        error: "Bill not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: bill,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PATCH /api/bills/:uuid
+// Accepts the full bill payload so the frontend can edit an existing bill atomically.
+const updateBill = async (req, res, next) => {
+  try {
+    const payload = normalizeBillPayload(req.body, req.params.uuid);
+
+    const bill = await Bill.findOneAndUpdate(
+      { uuid: req.params.uuid },
+      payload,
+      {
+        new: true,
+        runValidators: true,
+        context: "query",
+      },
+    );
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        error: "Bill not found",
       });
     }
 
@@ -92,19 +137,19 @@ const deleteBill = async (req, res, next) => {
         isDeleted: true,
         updatedAt: new Date(),
       },
-      { new: true }
+      { new: true },
     );
 
     if (!bill) {
       return res.status(404).json({
         success: false,
-        error: 'Bill not found',
+        error: "Bill not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Bill deleted (soft)',
+      message: "Bill deleted (soft)",
       data: bill,
     });
   } catch (error) {
@@ -115,5 +160,6 @@ const deleteBill = async (req, res, next) => {
 module.exports = {
   getAllBills,
   getBillByUuid,
+  updateBill,
   deleteBill,
 };

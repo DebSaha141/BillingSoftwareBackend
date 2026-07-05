@@ -119,6 +119,8 @@ const pushSync = async (req, res, next) => {
             `[Sync] Deleted bill ${bill.uuid}: ${deleteResult.deletedCount} doc(s) removed`,
           );
         } else {
+          const timestamp = bill.timestamp ?? bill.createdAt;
+
           await Bill.findOneAndUpdate(
             { uuid: bill.uuid },
             {
@@ -131,11 +133,12 @@ const pushSync = async (req, res, next) => {
               taxPercent: bill.taxPercent || 0,
               taxAmount: bill.taxAmount || 0,
               grandTotal: bill.grandTotal,
+              timestamp,
               paymentMethod: bill.paymentMethod || "cash",
               customerName: bill.customerName || "",
               customerPhone: bill.customerPhone || "",
               isDeleted: false,
-              createdAt: new Date(bill.createdAt),
+              createdAt: new Date(timestamp),
               updatedAt: new Date(bill.updatedAt),
             },
             {

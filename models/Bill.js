@@ -108,6 +108,13 @@ const billSchema = new mongoose.Schema({
     min: 0,
   },
 
+  // Canonical bill creation time coming from the Flutter client
+  timestamp: {
+    type: Date,
+    required: true,
+    index: true,
+  },
+
   paymentMethod: {
     type: String,
     enum: ["cash", "upi", "card", "mixed", "credit"],
@@ -147,6 +154,7 @@ const billSchema = new mongoose.Schema({
 
 // Index for dashboard queries
 // "Get all bills for today" or "bills in date range"
+billSchema.index({ timestamp: -1 });
 billSchema.index({ createdAt: -1 });
 billSchema.index({ createdAt: 1, isDeleted: 1 });
 
